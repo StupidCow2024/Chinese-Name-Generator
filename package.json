@@ -1,0 +1,24 @@
+{
+  "name": "chinese-name-generator",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --trace-warnings server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "description": "一个智能化的英文转中文姓名推荐系统，为外国友人提供富有文化内涵和个性化的中文名字选择。",
+  "main": "server.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chinese Name Generator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chinese Name Generator</h1>
+            <p class="subtitle">Generate your Chinese name with cultural meaning</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="englishName">Enter your English name</label>
+                    <input type="text" id="englishName" placeholder="e.g., John" autocomplete="off">
+                </div>
+
+                <div class="input-group">
+                    <label for="gender">Select gender preference</label>
+                    <select id="gender">
+                        <option value="neutral">Neutral</option>
+                        <option value="masculine">Masculine</option>
+                        <option value="feminine">Feminine</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button id="generateBtn" class="primary-btn">Generate Names</button>
+                    <button id="clearBtn" class="secondary-btn">Clear</button>
+                </div>
+            </div>
+
+            <div id="loading" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Generating names...</p>
+            </div>
+
+            <div id="results" class="results-section"></div>
+        </main>
+
+        <footer>
+            <p>© 2024 Chinese Name Generator. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
+                    messageDiv.textContent = 'Name copied to clipboard';
+                    document.body.appendChild(messageDiv);
+                    setTimeout(() => messageDiv.remove(), 2000);
+                })
+                .catch(() => {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.textContent = 'Failed to copy';
+                    document.body.appendChild(errorDiv);
+                    setTimeout(() => errorDiv.remove(), 2000);
+                });
+        }
+    </script>
+</body>
+</html> 
