@@ -115,17 +115,25 @@ app.post('/api/generate-name', async (req, res) => {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
-            }
+            },
+            timeout: 30000 // 30 seconds timeout
         });
 
         console.log('Received response from Zhipu AI');
         console.log('Response status:', response.status);
         console.log('Response data:', JSON.stringify(response.data, null, 2));
 
-        const nameData = JSON.parse(response.data.choices[0].message.content);
-        console.log('Parsed name data:', nameData);
-        
-        return res.json(nameData);
+        try {
+            const nameData = JSON.parse(response.data.choices[0].message.content);
+            console.log('Parsed name data:', nameData);
+            return res.json(nameData);
+        } catch (parseError) {
+            console.error('Failed to parse AI response:', parseError);
+            return res.status(500).json({
+                error: 'Failed to parse AI response',
+                details: response.data.choices[0].message.content
+            });
+        }
 
     } catch (error) {
         console.error('API Error:', {
@@ -135,6 +143,13 @@ app.post('/api/generate-name', async (req, res) => {
             headers: error.response?.headers
         });
         
+        if (error.code === 'ECONNABORTED') {
+            return res.status(504).json({
+                error: 'Request timeout',
+                details: 'The request to the AI service timed out'
+            });
+        }
+
         if (error.response?.status === 401) {
             return res.status(401).json({
                 error: 'Authentication failed',
@@ -145,7 +160,9 @@ app.post('/api/generate-name', async (req, res) => {
         if (error.response?.data) {
             return res.status(500).json({
                 error: 'API request failed',
-                details: error.response.data
+                details: typeof error.response.data === 'string' 
+                    ? error.response.data 
+                    : JSON.stringify(error.response.data)
             });
         }
         
