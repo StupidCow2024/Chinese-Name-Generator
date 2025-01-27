@@ -166,7 +166,12 @@ class ChineseNameGenerator {
 
             if (!response.ok) {
                 console.error('Server error:', data);
-                throw new Error(data.details?.error || data.details || data.error || 'Failed to generate name');
+                throw new Error(data.details || data.error || 'Failed to generate name');
+            }
+
+            if (!Array.isArray(data) || data.length === 0) {
+                console.error('Invalid response format:', data);
+                throw new Error('Received invalid data format from server');
             }
 
             console.log('Response from server:', data);
@@ -174,6 +179,9 @@ class ChineseNameGenerator {
 
         } catch (error) {
             console.error('Error in generateChineseName:', error);
+            if (error.name === 'TypeError' && error.message.includes('JSON')) {
+                throw new Error('Server returned invalid data format');
+            }
             throw error;
         }
     }
