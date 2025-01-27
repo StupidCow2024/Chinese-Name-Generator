@@ -131,16 +131,22 @@ app.post('/api/generate-name', async (req, res) => {
             });
             
             if (error.response?.status === 401) {
-                return res.status(500).json({
+                return res.status(401).json({
                     error: 'Authentication failed',
-                    details: 'Failed to authenticate with the AI service. Please check API key.'
+                    details: 'Failed to authenticate with the AI service'
+                });
+            }
+
+            if (error.response?.data) {
+                return res.status(500).json({
+                    error: 'API request failed',
+                    details: error.response.data
                 });
             }
             
             return res.status(500).json({
-                error: 'API request failed',
-                details: error.response?.data?.error || error.message,
-                status: error.response?.status
+                error: 'Internal server error',
+                details: error.message || 'Unknown error occurred'
             });
         }
 
