@@ -39,6 +39,7 @@ app.post('/api/generate-name', async (req, res) => {
         const { englishName, gender } = req.body;
         
         console.log('Received request:', { englishName, gender });
+        console.log('Using API key:', API_KEY);
         
         if (!englishName || !gender) {
             console.log('Missing required fields');
@@ -87,78 +88,70 @@ app.post('/api/generate-name', async (req, res) => {
     }
 ]`;
 
-        try {
-            // 生成 JWT Token
-            const token = generateToken(API_KEY);
-            console.log('Generated JWT token');
+        // 生成 JWT Token
+        const token = generateToken(API_KEY);
+        console.log('Generated token payload:', {
+            api_key: API_KEY,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            timestamp: Math.floor(Date.now() / 1000)
+        });
+        console.log('Generated JWT token');
 
-            // 发送请求到智谱AI
-            console.log('Sending request to Zhipu AI...');
-            const response = await axios.post(API_URL, {
-                model: "glm-4-flash",
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt
-                    }
-                ],
-                temperature: 0.7,
-                top_p: 0.9,
-                stream: false
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+        // 发送请求到智谱AI
+        console.log('Sending request to Zhipu AI...');
+        const response = await axios.post(API_URL, {
+            model: "glm-4-flash",
+            messages: [
+                {
+                    role: "user",
+                    content: prompt
                 }
-            });
-
-            console.log('Received response from Zhipu AI');
-            console.log('Response status:', response.status);
-            console.log('Response data:', JSON.stringify(response.data, null, 2));
-
-            const nameData = JSON.parse(response.data.choices[0].message.content);
-            console.log('Parsed name data:', nameData);
-            
-            return res.json(nameData);
-
-        } catch (error) {
-            console.error('API Error:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers
-            });
-            
-            if (error.response?.status === 401) {
-                return res.status(401).json({
-                    error: 'Authentication failed',
-                    details: 'Failed to authenticate with the AI service'
-                });
+            ],
+            temperature: 0.7,
+            top_p: 0.9,
+            stream: false
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             }
+        });
 
-            if (error.response?.data) {
-                return res.status(500).json({
-                    error: 'API request failed',
-                    details: error.response.data
-                });
-            }
-            
-            return res.status(500).json({
-                error: 'Internal server error',
-                details: error.message || 'Unknown error occurred'
+        console.log('Received response from Zhipu AI');
+        console.log('Response status:', response.status);
+        console.log('Response data:', JSON.stringify(response.data, null, 2));
+
+        const nameData = JSON.parse(response.data.choices[0].message.content);
+        console.log('Parsed name data:', nameData);
+        
+        return res.json(nameData);
+
+    } catch (error) {
+        console.error('API Error:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            headers: error.response?.headers
+        });
+        
+        if (error.response?.status === 401) {
+            return res.status(401).json({
+                error: 'Authentication failed',
+                details: 'Failed to authenticate with the AI service'
             });
         }
 
-    } catch (error) {
-        console.error('Server Error:', {
-            message: error.message,
-            stack: error.stack
-        });
+        if (error.response?.data) {
+            return res.status(500).json({
+                error: 'API request failed',
+                details: error.response.data
+            });
+        }
         
         return res.status(500).json({
-            error: 'Server error',
-            details: error.message
+            error: 'Internal server error',
+            details: error.message || 'Unknown error occurred'
         });
     }
 });
