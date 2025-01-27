@@ -105,7 +105,9 @@ app.post('/api/generate-name', async (req, res) => {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-            timeout: 60000 // 增加到 60 秒
+            timeout: 120000, // 增加到 120 秒
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity
         };
 
         const requestData = {
@@ -118,38 +120,91 @@ app.post('/api/generate-name', async (req, res) => {
             ],
             temperature: 0.7,
             top_p: 0.9,
-            stream: false
+            stream: false,
+            max_tokens: 2000
         };
 
-        console.log('Request config:', { url: API_URL, ...axiosConfig });
-        const response = await axios.post(API_URL, requestData, axiosConfig);
-
-        console.log('Received response from Zhipu AI');
-        console.log('Response status:', response.status);
-        console.log('Response data:', JSON.stringify(response.data, null, 2));
-
-        if (!response.data?.choices?.[0]?.message?.content) {
-            console.error('Invalid response format:', response.data);
-            return res.status(500).json({
-                error: 'Invalid API response',
-                details: 'The AI service returned an unexpected response format'
-            });
-        }
-
         try {
-            const nameData = JSON.parse(response.data.choices[0].message.content);
-            console.log('Parsed name data:', nameData);
+            console.log('Request config:', { url: API_URL, ...axiosConfig });
+            const response = await axios.post(API_URL, requestData, axiosConfig);
+
+            console.log('Received response from Zhipu AI');
+            console.log('Response status:', response.status);
             
-            if (!Array.isArray(nameData) || nameData.length === 0) {
-                throw new Error('Invalid name data format');
+            if (!response.data) {
+                throw new Error('Empty response from AI service');
             }
-            
+
+            console.log('Response data:', JSON.stringify(response.data, null, 2));
+
+            if (!response.data?.choices?.[0]?.message?.content) {
+                console.error('Invalid response format:', response.data);
+                return res.status(500).json({
+                    error: 'Invalid API response',
+                    details: 'The AI service returned an unexpected response format'
+                });
+            }
+
+            let nameData;
+            try {
+                nameData = JSON.parse(response.data.choices[0].message.content);
+            } catch (parseError) {
+                console.error('Failed to parse AI response:', {
+                    error: parseError,
+                    content: response.data.choices[0].message.content
+                });
+                return res.status(500).json({
+                    error: 'Failed to parse AI response',
+                    details: 'The AI service returned invalid JSON data'
+                });
+            }
+
+            if (!Array.isArray(nameData) || nameData.length === 0) {
+                console.error('Invalid name data format:', nameData);
+                return res.status(500).json({
+                    error: 'Invalid name data format',
+                    details: 'The AI service returned an invalid data structure'
+                });
+            }
+
             return res.json(nameData);
-        } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
+
+        } catch (error) {
+            console.error('API Error:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+                stack: error.stack
+            });
+
+            if (error.code === 'ECONNABORTED') {
+                return res.status(504).json({
+                    error: 'Request timeout',
+                    details: 'The request to the AI service timed out. Please try again.'
+                });
+            }
+
+            if (error.response?.status === 401) {
+                return res.status(401).json({
+                    error: 'Authentication failed',
+                    details: 'Failed to authenticate with the AI service. Please check the API key.'
+                });
+            }
+
+            if (error.response?.data) {
+                const errorDetails = typeof error.response.data === 'string' 
+                    ? error.response.data 
+                    : JSON.stringify(error.response.data);
+                return res.status(500).json({
+                    error: 'API request failed',
+                    details: errorDetails
+                });
+            }
+
             return res.status(500).json({
-                error: 'Failed to parse AI response',
-                details: 'The AI service returned invalid JSON data'
+                error: 'Internal server error',
+                details: error.message || 'An unexpected error occurred'
             });
         }
 
