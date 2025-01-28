@@ -49,25 +49,5 @@
     </div>
 
     <script type="module" src="js/main.js"></script>
-    
-    <script>
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message';
-                    messageDiv.textContent = 'Name copied to clipboard';
-                    document.body.appendChild(messageDiv);
-                    setTimeout(() => messageDiv.remove(), 2000);
-                })
-                .catch(() => {
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-message';
-                    errorDiv.textContent = 'Failed to copy';
-                    document.body.appendChild(errorDiv);
-                    setTimeout(() => errorDiv.remove(), 2000);
-                });
-        }
-    </script>
 </body>
 </html> 

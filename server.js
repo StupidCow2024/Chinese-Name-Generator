@@ -13,7 +13,17 @@ const __dirname = dirname(__filename);
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+
+// 设置请求大小限制
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 启用更详细的请求日志
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+});
+
 app.use(cors());
 
 // 添加静态文件服务
@@ -30,15 +40,19 @@ if (!API_KEY) {
 
 // 添加健康检查端点
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+    console.log('Health check requested');
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // 处理中文名生成请求
 app.post('/api/generate-name', async (req, res) => {
+    console.log('Received name generation request');
+    const requestStart = Date.now();
+    
     try {
         const { englishName, gender } = req.body;
         
-        console.log('Received request:', { englishName, gender });
+        console.log('Request details:', { englishName, gender });
         console.log('Using API key:', API_KEY);
         
         if (!englishName || !gender) {
@@ -79,22 +93,13 @@ app.post('/api/generate-name', async (req, res) => {
                 "meaning": "第二个字的含义和选择原因"
             }
         ]
-    },
-    {
-        // 第二个名字的相同结构
-    },
-    {
-        // 第三个名字的相同结构
     }
 ]`;
 
         // 生成 JWT Token
+        console.log('Generating JWT token...');
         const token = generateToken(API_KEY);
-        console.log('Generated token payload:', {
-            api_key: API_KEY,
-            exp: Math.floor(Date.now() / 1000) + 3600,
-            timestamp: Math.floor(Date.now() / 1000)
-        });
+        console.log('Token generated successfully');
 
         // 发送请求到智谱AI
         const axiosConfig = {
@@ -103,9 +108,12 @@ app.post('/api/generate-name', async (req, res) => {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-            timeout: 120000,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            timeout: 60000, // 60秒超时
+            maxContentLength: 50 * 1024 * 1024, // 50MB
+            maxBodyLength: 50 * 1024 * 1024, // 50MB
+            validateStatus: function (status) {
+                return status >= 200 && status < 500; // 只有状态码大于等于500时才抛出错误
+            }
         };
 
         const requestData = {
@@ -127,9 +135,18 @@ app.post('/api/generate-name', async (req, res) => {
 
         console.log('Received response from Zhipu AI');
         console.log('Response status:', response.status);
-        console.log('Response data:', JSON.stringify(response.data, null, 2));
+        console.log('Response time:', Date.now() - requestStart, 'ms');
+
+        if (response.status !== 200) {
+            console.error('API error response:', response.data);
+            return res.status(response.status).json({
+                error: 'API request failed',
+                details: response.data?.error || 'Unexpected API response'
+            });
+        }
 
         if (!response.data?.choices?.[0]?.message?.content) {
+            console.error('Invalid API response structure');
             return res.status(500).json({
                 error: 'Invalid API response',
                 details: 'The AI service returned an unexpected response format'
@@ -139,6 +156,7 @@ app.post('/api/generate-name', async (req, res) => {
         let nameData;
         try {
             nameData = JSON.parse(response.data.choices[0].message.content);
+            console.log('Successfully parsed name data');
         } catch (parseError) {
             console.error('Failed to parse AI response:', {
                 error: parseError,
@@ -158,20 +176,29 @@ app.post('/api/generate-name', async (req, res) => {
             });
         }
 
+        console.log('Sending successful response to client');
         return res.json(nameData);
 
     } catch (error) {
+        const errorResponse = {
+            error: 'Internal server error',
+            details: error.message,
+            timestamp: new Date().toISOString(),
+            requestDuration: Date.now() - requestStart
+        };
+
         console.error('API Error:', {
-            message: error.message,
+            ...errorResponse,
+            stack: error.stack,
             response: error.response?.data,
             status: error.response?.status,
-            headers: error.response?.headers,
-            stack: error.stack
+            headers: error.response?.headers
         });
 
         // 处理不同类型的错误
         if (error.code === 'ECONNABORTED') {
             return res.status(504).json({
+                ...errorResponse,
                 error: 'Request timeout',
                 details: 'The request to the AI service timed out. Please try again.'
             });
@@ -179,6 +206,7 @@ app.post('/api/generate-name', async (req, res) => {
 
         if (error.response?.status === 401) {
             return res.status(401).json({
+                ...errorResponse,
                 error: 'Authentication failed',
                 details: 'Failed to authenticate with the AI service. Please check the API key.'
             });
@@ -188,17 +216,15 @@ app.post('/api/generate-name', async (req, res) => {
             const errorDetails = typeof error.response.data === 'string'
                 ? error.response.data
                 : JSON.stringify(error.response.data);
-            return res.status(500).json({
+            return res.status(error.response.status || 500).json({
+                ...errorResponse,
                 error: 'API request failed',
                 details: errorDetails
             });
         }
 
         // 默认错误响应
-        return res.status(500).json({
-            error: 'Internal server error',
-            details: error.message || 'An unexpected error occurred'
-        });
+        return res.status(500).json(errorResponse);
     }
 });
 
@@ -213,11 +239,31 @@ process.on('unhandledRejection', (error) => {
     console.error('Unhandled Rejection:', error);
 });
 
+// 优雅关闭
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received. Shutting down gracefully...');
+    process.exit(0);
+});
+
 try {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
+        console.log('=================================');
         console.log(`Server running on port ${PORT}`);
-        console.log(`Health check available at http://localhost:${PORT}/health`);
+        console.log(`Health check: http://localhost:${PORT}/health`);
+        console.log(`API endpoint: http://localhost:${PORT}/api/generate-name`);
+        console.log('=================================');
     });
+
+    // 设置服务器超时
+    server.timeout = 120000; // 120秒
+    server.keepAliveTimeout = 120000;
+    server.headersTimeout = 120000;
+
 } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

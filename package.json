@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --trace-warnings server.js"
+    "dev": "nodemon server.js --trace-warnings | pino-pretty",
+    "debug": "node --inspect server.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -14,7 +15,8 @@
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "pino-pretty": "^10.3.1"
   },
   "description": "一个智能化的英文转中文姓名推荐系统，为外国友人提供富有文化内涵和个性化的中文名字选择。",
   "main": "server.js",

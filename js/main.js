@@ -4,6 +4,8 @@ class ChineseNameGenerator {
     constructor() {
         this.initializeUI();
         this.attachEventListeners();
+        // 将 copyToClipboard 绑定到 window 对象
+        window.copyToClipboard = this.copyToClipboard.bind(this);
     }
 
     // 初始化UI元素引用
@@ -58,10 +60,8 @@ class ChineseNameGenerator {
 
     // 显示结果
     displayResults(nameData) {
-        // 清空现有结果
         this.resultsContainer.innerHTML = '';
         
-        // 为每个名字创建一个卡片
         nameData.forEach((name, index) => {
             const card = document.createElement('div');
             card.className = 'result-card';
@@ -87,25 +87,47 @@ class ChineseNameGenerator {
                         </div>
                     `).join('')}
                 </div>
-                <button class="copy-btn secondary-btn" onclick="copyToClipboard('${name.chineseName}')">
+                <button class="copy-btn" data-name="${name.chineseName}">
                     Copy Name
                 </button>
             `;
             
+            // 添加复制按钮的点击事件监听器
+            const copyBtn = card.querySelector('.copy-btn');
+            copyBtn.addEventListener('click', () => {
+                this.copyToClipboard(copyBtn.dataset.name);
+            });
+            
             this.resultsContainer.appendChild(card);
         });
 
-        // 平滑滚动到结果区域
         this.resultsContainer.scrollIntoView({ behavior: 'smooth' });
     }
 
     // 复制到剪贴板
     async copyToClipboard(text) {
+        if (!text) return;
+        
         try {
             await navigator.clipboard.writeText(text);
             this.showMessage('Name copied to clipboard');
         } catch (err) {
-            this.showError('Failed to copy');
+            console.error('Copy failed:', err);
+            // 使用备用复制方法
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                this.showMessage('Name copied to clipboard');
+            } catch (err) {
+                this.showError('Failed to copy');
+            } finally {
+                document.body.removeChild(textArea);
+            }
         }
     }
 
@@ -129,11 +151,9 @@ class ChineseNameGenerator {
         errorDiv.className = 'error-message';
         errorDiv.textContent = message;
         
-        // 清除之前的内容
         this.resultsContainer.innerHTML = '';
         this.resultsContainer.appendChild(errorDiv);
         
-        // 3秒后自动清除错误信息
         setTimeout(() => {
             if (this.resultsContainer.contains(errorDiv)) {
                 errorDiv.remove();
@@ -162,26 +182,28 @@ class ChineseNameGenerator {
                 body: JSON.stringify({ englishName, gender })
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                console.error('Server error:', data);
-                throw new Error(data.details || data.error || 'Failed to generate name');
+                const errorData = await response.json().catch(() => null);
+                console.error('Server error response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorData
+                });
+                throw new Error(errorData?.details || errorData?.error || `Server error: ${response.status}`);
             }
+
+            const data = await response.json();
+            console.log('Response from server:', data);
 
             if (!Array.isArray(data) || data.length === 0) {
                 console.error('Invalid response format:', data);
-                throw new Error('Received invalid data format from server');
+                throw new Error('Server returned invalid data format');
             }
 
-            console.log('Response from server:', data);
             return data;
 
         } catch (error) {
             console.error('Error in generateChineseName:', error);
-            if (error.name === 'TypeError' && error.message.includes('JSON')) {
-                throw new Error('Server returned invalid data format');
-            }
             throw error;
         }
     }
