@@ -20,6 +20,16 @@
   ],
   "routes": [
     {
+      "src": "/api/generate-name",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "server.js"
+    },
+    {
+      "src": "/health",
+      "methods": ["GET"],
+      "dest": "server.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "server.js"
     },
