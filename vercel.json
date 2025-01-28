@@ -34,8 +34,8 @@
       "dest": "server.js"
     },
     {
-      "src": "/",
-      "dest": "index.html"
+      "src": "/(.*)",
+      "dest": "/$1"
     },
     {
       "src": "/js/(.*)",
@@ -48,5 +48,8 @@
     {
       "handle": "filesystem"
     }
-  ]
+  ],
+  "env": {
+    "ZHIPU_API_KEY": "@zhipu_api_key"
+  }
 } 
