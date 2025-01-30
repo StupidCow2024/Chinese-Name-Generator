@@ -2,214 +2,205 @@ import { generateChineseName } from './nameGenerator.js';
 
 class ChineseNameGenerator {
     constructor() {
-        this.initializeUI();
-        this.attachEventListeners();
-        // 将 copyToClipboard 绑定到 window 对象
-        window.copyToClipboard = this.copyToClipboard.bind(this);
-    }
-
-    // 初始化UI元素引用
-    initializeUI() {
         this.englishNameInput = document.getElementById('englishName');
         this.genderSelect = document.getElementById('gender');
-        this.generateButton = document.getElementById('generateBtn');
-        this.clearButton = document.getElementById('clearBtn');
-        this.resultsContainer = document.getElementById('results');
-        this.loadingSpinner = document.getElementById('loading');
+        this.generateBtn = document.getElementById('generateBtn');
+        this.clearBtn = document.getElementById('clearBtn');
+        this.loadingElement = document.getElementById('loading');
+        this.resultsElement = document.getElementById('results');
+
+        this.initializeEventListeners();
     }
 
-    // 添加事件监听器
-    attachEventListeners() {
-        // 生成按钮点击事件
-        this.generateButton.addEventListener('click', () => this.handleGenerate());
-        
-        // 清除按钮点击事件
-        this.clearButton.addEventListener('click', () => this.clearAll());
-        
-        // Enter键事件
+    initializeEventListeners() {
+        this.generateBtn.addEventListener('click', () => this.handleGenerate());
+        this.clearBtn.addEventListener('click', () => this.handleClear());
         this.englishNameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                e.preventDefault();
                 this.handleGenerate();
             }
         });
     }
 
-    // 处理生成名字的逻辑
     async handleGenerate() {
         const englishName = this.englishNameInput.value.trim();
         const gender = this.genderSelect.value;
-        
+
         if (!englishName) {
-            this.showError('Please enter your English name');
+            this.showMessage('请输入英文名', 'error');
             return;
         }
 
-        this.showLoading(true);
-        
+        this.showLoading();
+
         try {
-            const nameData = await this.generateChineseName(englishName, gender);
-            this.displayResults(nameData);
+            const response = await this.generateChineseName(englishName, gender);
+            this.displayResults(response);
         } catch (error) {
-            this.showError(error.message);
-            console.error('Error:', error);
+            console.error('Error in handleGenerate:', error);
+            this.showMessage(error.message || '生成名字时出错，请稍后重试', 'error');
         } finally {
-            this.showLoading(false);
+            this.hideLoading();
         }
-    }
-
-    // 显示结果
-    displayResults(nameData) {
-        this.resultsContainer.innerHTML = '';
-        
-        nameData.forEach((name, index) => {
-            const card = document.createElement('div');
-            card.className = 'result-card';
-            card.innerHTML = `
-                <div class="result-header">
-                    <div class="suggestion-number">Option ${index + 1}</div>
-                    <div class="chinese-name">${name.chineseName}</div>
-                    <div class="pronunciation">${name.pinyin}</div>
-                </div>
-                <div class="meaning-section">
-                    <h3>Name Meaning</h3>
-                    <p>${name.meaning}</p>
-                </div>
-                <div class="cultural-section">
-                    <h3>Cultural Reference</h3>
-                    <p>${name.culturalReference}</p>
-                </div>
-                <div class="individual-chars">
-                    ${name.characters.map(char => `
-                        <div class="char-details">
-                            <h4>${char.character}</h4>
-                            <p>${char.meaning}</p>
-                        </div>
-                    `).join('')}
-                </div>
-                <button class="copy-btn" data-name="${name.chineseName}">
-                    Copy Name
-                </button>
-            `;
-            
-            // 添加复制按钮的点击事件监听器
-            const copyBtn = card.querySelector('.copy-btn');
-            copyBtn.addEventListener('click', () => {
-                this.copyToClipboard(copyBtn.dataset.name);
-            });
-            
-            this.resultsContainer.appendChild(card);
-        });
-
-        this.resultsContainer.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // 复制到剪贴板
-    async copyToClipboard(text) {
-        if (!text) return;
-        
-        try {
-            await navigator.clipboard.writeText(text);
-            this.showMessage('Name copied to clipboard');
-        } catch (err) {
-            console.error('Copy failed:', err);
-            // 使用备用复制方法
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-9999px';
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                this.showMessage('Name copied to clipboard');
-            } catch (err) {
-                this.showError('Failed to copy');
-            } finally {
-                document.body.removeChild(textArea);
-            }
-        }
-    }
-
-    // 清除所有内容
-    clearAll() {
-        this.englishNameInput.value = '';
-        this.genderSelect.value = 'neutral';
-        this.resultsContainer.innerHTML = '';
-        this.englishNameInput.focus();
-    }
-
-    // 显示/隐藏加载动画
-    showLoading(show) {
-        this.loadingSpinner.style.display = show ? 'block' : 'none';
-        this.generateButton.disabled = show;
-    }
-
-    // 显示错误信息
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        
-        this.resultsContainer.innerHTML = '';
-        this.resultsContainer.appendChild(errorDiv);
-        
-        setTimeout(() => {
-            if (this.resultsContainer.contains(errorDiv)) {
-                errorDiv.remove();
-            }
-        }, 3000);
-    }
-
-    // 显示提示信息
-    showMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message';
-        messageDiv.textContent = message;
-        document.body.appendChild(messageDiv);
-        setTimeout(() => messageDiv.remove(), 2000);
     }
 
     async generateChineseName(englishName, gender) {
         try {
-            console.log('Sending request to server...', { englishName, gender });
-            
-            const response = await fetch(`${window.location.origin}/api/generate-name`, {
+            const response = await fetch('/api/generate-name', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify({ englishName, gender })
             });
 
+            let errorMessage = '服务器响应错误';
+            let responseText = '';
+
+            try {
+                responseText = await response.text();
+                console.log('Server response:', responseText);
+            } catch (e) {
+                console.error('Error reading response:', e);
+                throw new Error('无法读取服务器响应');
+            }
+
             if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
                 console.error('Server error response:', {
                     status: response.status,
                     statusText: response.statusText,
-                    errorData
+                    responseText: responseText
                 });
-                throw new Error(errorData?.details || errorData?.error || `Server error: ${response.status}`);
+
+                try {
+                    const errorJson = JSON.parse(responseText);
+                    if (response.status === 504) {
+                        this.showMessage('生成名字需要较长时间，请耐心等待...', 'info');
+                        return await this.generateChineseName(englishName, gender);
+                    }
+                    errorMessage = errorJson.error || errorJson.message || errorMessage;
+                } catch (e) {
+                    if (response.status === 405) {
+                        errorMessage = '服务器不支持该请求方法';
+                    }
+                }
+
+                throw new Error(errorMessage);
             }
 
-            const data = await response.json();
-            console.log('Response from server:', data);
-
-            if (!Array.isArray(data) || data.length === 0) {
-                console.error('Invalid response format:', data);
-                throw new Error('Server returned invalid data format');
+            if (!responseText) {
+                throw new Error('服务器返回空响应');
             }
 
-            return data;
-
+            try {
+                return JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError, 'Response text:', responseText);
+                throw new Error('无法解析服务器响应');
+            }
         } catch (error) {
             console.error('Error in generateChineseName:', error);
             throw error;
         }
     }
+
+    handleClear() {
+        this.englishNameInput.value = '';
+        this.genderSelect.value = 'neutral';
+        this.resultsElement.innerHTML = '';
+    }
+
+    showLoading() {
+        this.loadingElement.style.display = 'flex';
+        this.resultsElement.innerHTML = '';
+    }
+
+    hideLoading() {
+        this.loadingElement.style.display = 'none';
+    }
+
+    showMessage(message, type = 'info') {
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${type}-message`;
+        messageElement.textContent = message;
+        document.body.appendChild(messageElement);
+
+        setTimeout(() => {
+            messageElement.remove();
+        }, 3000);
+    }
+
+    displayResults(names) {
+        this.resultsElement.innerHTML = '';
+        
+        names.forEach((name, index) => {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            
+            card.innerHTML = `
+                <div class="result-header">
+                    <div class="suggestion-number">推荐 ${index + 1}</div>
+                    <h2 class="chinese-name">${name.chineseName}</h2>
+                    <div class="pronunciation">${name.pinyin}</div>
+                </div>
+
+                <div class="meaning-section">
+                    <h3>名字寓意</h3>
+                    <p><strong>整体含义：</strong>${name.meaning.overall}</p>
+                    <p><strong>文化内涵：</strong>${name.meaning.cultural}</p>
+                    <p><strong>性格特质：</strong>${name.meaning.personality}</p>
+                </div>
+
+                <div class="characters-section">
+                    <h3>字义详解</h3>
+                    ${name.characters.map(char => `
+                        <div class="char-details">
+                            <h4>${char.character} (${char.pinyin})</h4>
+                            <p><strong>含义：</strong>${char.meaning}</p>
+                            ${char.cultural_reference ? `<p><strong>文化典故：</strong>${char.cultural_reference}</p>` : ''}
+                            ${char.personality_trait ? `<p><strong>性格特质：</strong>${char.personality_trait}</p>` : ''}
+                            ${char.usage ? `<p><strong>使用频率：</strong>${char.usage}</p>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="additional-info">
+                    <h3>补充信息</h3>
+                    <p><strong>发音技巧：</strong>${name.pronunciation_tips}</p>
+                    <p><strong>现代意义：</strong>${name.modern_context}</p>
+                </div>
+
+                <button class="copy-btn" onclick="copyToClipboard('${name.chineseName}')">
+                    复制名字
+                </button>
+            `;
+            
+            this.resultsElement.appendChild(card);
+        });
+    }
 }
 
-// 当页面加载完成时初始化应用
-document.addEventListener('DOMContentLoaded', () => {
-    window.nameGenerator = new ChineseNameGenerator();
-}); 
+// 复制到剪贴板的功能
+window.copyToClipboard = async function(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message';
+        messageElement.textContent = '名字已复制到剪贴板';
+        document.body.appendChild(messageElement);
+        setTimeout(() => messageElement.remove(), 2000);
+    } catch (err) {
+        console.error('复制失败:', err);
+        const messageElement = document.createElement('div');
+        messageElement.className = 'error-message';
+        messageElement.textContent = '复制失败，请手动复制';
+        document.body.appendChild(messageElement);
+        setTimeout(() => messageElement.remove(), 2000);
+    }
+};
+
+// 初始化生成器
+new ChineseNameGenerator(); 
