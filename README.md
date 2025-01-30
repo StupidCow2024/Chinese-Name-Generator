@@ -121,3 +121,5 @@
 ## 许可证
 
 MIT License 
+
+lsof -i :3000 

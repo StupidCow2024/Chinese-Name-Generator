@@ -94,90 +94,56 @@ app.get('/health', cors(corsOptions), (req, res) => {
 
 // 处理中文名生成请求
 app.post('/api/generate-name', cors(corsOptions), async (req, res) => {
-    console.log('Received name generation request');
     const requestStart = Date.now();
-    
-    try {
-        const { englishName, gender } = req.body;
-        
-        console.log('Request details:', { englishName, gender });
-        console.log('Using API key:', API_KEY);
-        
-        if (!englishName || !gender) {
-            console.log('Missing required fields');
-            return res.status(400).json({
-                error: 'Missing required fields',
-                details: 'Both englishName and gender are required'
-            });
-        }
+    const { englishName, gender } = req.body;
 
-        const prompt = `作为一位专业的中文姓名翻译专家，你需要为英文名 "${englishName}" (性别倾向: ${gender}) 创建三个独特的中文名字。每个名字都应该体现深厚的文化内涵和个性化特点。
+    console.log('Received name generation request');
+    console.log('Request details:', { englishName, gender });
 
-命名原则：
-1. 姓氏选择：
-   - 选择不同的常见中国姓氏（如：李、王、张等）
-   - 考虑姓氏的历史渊源和文化意义
-   - 避免生僻或不常见的姓氏
-
-2. 发音要求：
-   - 名字的发音要尽可能接近英文名的音节
-   - 确保声调搭配和谐，避免生硬的音节组合
-   - 整体读音要朗朗上口，易于记忆
-
-3. 字义考量：
-   - 根据性别倾向选择合适的字
-   - 男性：选用阳刚、气势、才华等内涵的字
-   - 女性：选用优雅、灵秀、智慧等内涵的字
-   - 中性：选用德行、智慧、自然等通用内涵的字
-
-4. 文化内涵：
-   - 每个字都要有深厚的文化底蕴
-   - 可以引用诗词典故或历史典故
-   - 体现传统文化中的美好寓意
-   - 注重字义之间的和谐统一
-
-5. 现代适用性：
-   - 避免过于古板或过时的用字
-   - 符合现代审美和价值观
-   - 便于在国际交往中使用
-   - 适合在当代社会使用
-
-请严格按照以下JSON格式返回三个名字的数组，确保每个名字都独特且符合上述要求：
-[
-    {
-        "chineseName": "完整的中文名字",
-        "pinyin": "标准汉语拼音（包含声调）",
-        "meaning": {
-            "overall": "名字的整体含义和寓意",
-            "cultural": "相关的文化内涵和典故出处",
-            "personality": "暗含的性格特质和期望"
-        },
-        "characters": [
-            {
-                "character": "姓氏",
-                "pinyin": "姓氏的拼音",
-                "meaning": "姓氏的来源和历史意义",
-                "usage": "在中国的使用频率和代表性"
-            },
-            {
-                "character": "名字第一个字",
-                "pinyin": "第一个字的拼音",
-                "meaning": "字义解释",
-                "cultural_reference": "相关的文化典故",
-                "personality_trait": "暗含的性格特质"
-            },
-            {
-                "character": "名字第二个字",
-                "pinyin": "第二个字的拼音",
-                "meaning": "字义解释",
-                "cultural_reference": "相关的文化典故",
-                "personality_trait": "暗含的性格特质"
-            }
-        ],
-        "pronunciation_tips": "关于读音的特别说明和技巧",
-        "modern_context": "在现代社会中使用这个名字的优势和特点"
+    if (!englishName) {
+        return res.status(400).json({
+            error: 'Missing required parameter: englishName'
+        });
     }
-]`;
+
+    try {
+        const messages = [
+            {
+                role: "system",
+                content: `你是一个专业的中文起名专家，精通中英文发音对照和音译规则。你的任务是为外国人生成中文名字。
+                
+                要求：
+                1. 必须严格按照英文名的发音特点进行音译，保持声音的相似性
+                2. 每个字都要选用常见、易写、寓意好的汉字
+                3. 需要考虑性别特征，选用合适的字
+                4. 生成3个不同的名字方案
+                5. 提供完整的解释，包括发音、含义等
+                
+                音译规则：
+                1. 优先选择与英文音节发音相近的汉字
+                2. 对于辅音，要尽可能匹配相似的声母
+                3. 对于元音，要选择相近的韵母
+                4. 声调要和谐，避免生硬
+                
+                输出格式要求：
+                返回一个数组，包含3个名字对象，每个对象包含：
+                1. chineseName: 中文名字
+                2. pinyin: 拼音
+                3. pronunciation_tips: 发音要点和英文名的对应关系
+                4. meaning: { overall, cultural, personality }
+                5. characters: 每个字的详细信息数组
+                6. modern_context: 现代语境下的含义`
+            },
+            {
+                role: "user",
+                content: `请为英文名 "${englishName}" 生成中文名。性别偏好：${gender}。
+                要特别注意：
+                1. 名字发音要尽可能接近英文名
+                2. 字义要积极向上
+                3. 要易写易记
+                4. 要符合中国文化特色`
+            }
+        ];
 
         // 生成 JWT Token
         console.log('Generating JWT token...');
@@ -200,12 +166,7 @@ app.post('/api/generate-name', cors(corsOptions), async (req, res) => {
 
         const requestData = {
             model: "glm-4-flash",
-            messages: [
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
+            messages: messages,
             temperature: 0.7,
             top_p: 0.9,
             stream: false,
@@ -243,7 +204,11 @@ app.post('/api/generate-name', cors(corsOptions), async (req, res) => {
 
         let nameData;
         try {
-            nameData = JSON.parse(response.data.choices[0].message.content);
+            // 预处理 AI 响应，移除 Markdown 格式
+            let content = response.data.choices[0].message.content;
+            // 移除 Markdown 代码块标记
+            content = content.replace(/```json\n|\n```/g, '');
+            nameData = JSON.parse(content);
             console.log('Successfully parsed name data');
         } catch (parseError) {
             console.error('Failed to parse AI response:', {
