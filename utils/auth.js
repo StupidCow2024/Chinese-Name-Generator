@@ -6,6 +6,16 @@ export function generateToken(apiKey) {
         // 解析 API Key
         const [id, secret] = apiKey.split('.');
         
+        if (!id || !secret) {
+            throw new Error('Invalid API key format');
+        }
+
+        console.log('Generating token with:', {
+            id: id,
+            secretLength: secret.length,
+            timestamp: Math.floor(Date.now() / 1000)
+        });
+
         // 当前时间戳（秒）
         const timestamp = Math.floor(Date.now() / 1000);
         
@@ -25,11 +35,15 @@ export function generateToken(apiKey) {
             }
         });
 
-        console.log('Generated token payload:', payload);
+        console.log('Token generation successful:', {
+            payload: payload,
+            tokenLength: token.length
+        });
+
         return token;
 
     } catch (error) {
         console.error('Error generating token:', error);
-        throw new Error('Failed to generate authentication token');
+        throw new Error('Failed to generate authentication token: ' + error.message);
     }
 } 
